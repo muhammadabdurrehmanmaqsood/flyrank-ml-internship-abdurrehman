@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prioritizing Declining Content: A Decision-Support Model for Refresh Queues</title>
+<style>
+  :root {
+    --ink: #1e293b;
+    --muted: #64748b;
+    --line: #e2e8f0;
+    --accent: #2563eb;
+    --bg: #ffffff;
+    --panel: #f8fafc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.65;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 56px 24px 100px; }
+  header.title-block { margin-bottom: 48px; }
+  h1 { font-size: 2rem; line-height: 1.25; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--muted); font-size: 1.05rem; margin-bottom: 24px; }
+  .meta { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0; }
+  h2 { font-size: 1.4rem; margin-top: 56px; margin-bottom: 16px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.1rem; margin-top: 28px; margin-bottom: 10px; }
+  p { margin: 0 0 16px; font-size: 1rem; }
+  .abstract { background: var(--panel); border-left: 3px solid var(--accent); padding: 20px 24px; border-radius: 4px; font-size: 0.98rem; }
+  ul, ol { margin: 0 0 16px; padding-left: 22px; }
+  li { margin-bottom: 6px; }
+  code { background: var(--panel); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 8px; font-size: 0.93rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  figure { margin: 24px 0; }
+  figure img { width: 100%; border: 1px solid var(--line); border-radius: 6px; }
+  figcaption { font-size: 0.88rem; color: var(--muted); margin-top: 8px; text-align: center; }
+  .callout { background: #fef3c7; border-left: 3px solid #d97706; padding: 14px 18px; border-radius: 4px; font-size: 0.95rem; margin: 20px 0; }
+  .callout.good { background: #dcfce7; border-left-color: #16a34a; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 0.88rem; color: var(--muted); }
+  .badge { display: inline-block; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 0.8rem; color: var(--muted); margin-right: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="title-block">
+  <span class="badge">Decision-support research</span>
+  <span class="badge">Content refresh prioritization</span>
+  <h1>Prioritizing Declining Content: A Decision-Support Model for Refresh Queues</h1>
+  <p class="subtitle">Which specific, currently declining pages should a content team review first &mdash; and how much can search-signal data alone actually tell us?</p>
+  <div class="meta">FlyRank ML Internship Capstone &middot; Search intelligence portfolio, 32 clients &middot; August 2026</div>
+</header>
+
+<section id="abstract">
+  <h2>Abstract</h2>
+  <div class="abstract">
+    <p style="margin:0">Content teams routinely have more pages than they have hours to review, and no reliable way to decide which stale, sliding page is worth fixing first. This project asks whether observable search signals &mdash; clicks, sessions, position, staleness &mdash; can rank a content portfolio by decline risk well enough to be useful. Using a 90-day trailing slice of anonymized search performance data across 32 clients, a grouped-by-client logistic regression was trained and, critically, audited for leakage: an initial version scored a suspicious 100% accuracy, which a leakage confession test traced to two features that were mathematically tied to the label itself. Once removed, the honest model reaches roughly 67% accuracy against a 62.8% base rate globally &mdash; modest &mdash; but the top of its ranked queue is meaningfully cleaner, at ~88% precision in the top 100 candidates. The result is not a prediction of what will happen to any single page, but a decision-support ranking: a shortlist a human reviewer can trust more than the top of an unranked list, with the biggest caveat being that the validation holdout happened to be dominated by one content type.</p>
+  </div>
+</section>
+
+<section id="intro">
+  <h2>Introduction &amp; Problem Statement</h2>
+  <p>A content team manages far more pages than it can manually re-review on a regular cadence. Some pages are quietly declining in search visibility; most are fine. The team's real bottleneck isn't knowing <em>that</em> some pages decline &mdash; it's knowing <strong>which</strong> declining page to open first, given a finite number of reviewer-hours today.</p>
+  <p>The decision this work supports: <em>which specific, currently declining pages should the content team review first?</em> The action a human takes from it is to open the top-ranked page and decide, using the model's stated reason codes, whether to refresh it, consolidate it, or leave it alone. The cost of getting this wrong is concrete &mdash; if a low-value, seasonal, or effectively dead page reaches the top of the queue, a reviewer spends real hours on a page with little upside while a higher-value opportunity sits unreviewed further down the list.</p>
+  <p>This is a ranking and prioritization problem, not a causal one: nothing here claims that refreshing a page <em>causes</em> it to recover. The goal is a defensible <strong>shortlist</strong>, not a guarantee.</p>
+</section>
+
+<section id="data">
+  <h2>Data</h2>
+  <p>The analysis draws on the FlyRank ML Internship warehouse, specifically the <code>fact_content_daily_performance</code> table, alongside a trailing-90-day anonymized content-performance slice used for modeling. The core modeling dataset covers <strong>32 clients</strong> and three content types (keyword article, feedly article, comparison article), with each row representing one content item's performance over a defined window &mdash; report_date &times; client &times; content grain, confirmed at exactly one row per grain group with no duplication.</p>
+  <p>A separate exploratory month-slice of the warehouse (March 2026) was checked for scale and confirmed <strong>9,841,378 rows</strong> in a single month across the full client base, consistent with the program's overall ~79 million row production search dataset.</p>
+
+  <h3>What was excluded, and why</h3>
+  <ul>
+    <li><strong>Client and content identifiers</strong> (<code>client_id</code>, <code>content_id</code>) are used only for grouping the train/test split &mdash; never as model features, and never surfaced here beyond anonymized/hashed form.</li>
+    <li><strong><code>trend_direction</code> and <code>trend_pct</code></strong> are excluded from the feature set entirely: the target label is mathematically derived from them, so including them would hand the model the answer.</li>
+    <li><strong>No client names, raw URLs, or verbatim search queries appear anywhere</strong> in this analysis or the underlying notebooks &mdash; a public-safety pass was run specifically for this before publishing.</li>
+    <li><strong>GA4 zero-fills were treated as missing, not zero.</strong> A blank/zero in analytics data here means "not measured," not "no engagement" &mdash; conflating the two would silently bias the model.</li>
+  </ul>
+
+  <h3>Data limits</h3>
+  <p>Client history depth is uneven &mdash; some clients have far more historical tracking than others &mdash; so a single global calendar window cannot be assumed to mean the same thing for every client. The dataset used for modeling also has no <code>report_date</code>-style column, only a duration field (<code>days_since_last_update</code>); this means every split in this project is a <strong>grouped</strong> split (by client), not a genuinely time-aware, past-vs-future split. That distinction matters for how the results below should be read.</p>
+</section>
+
+<section id="methodology">
+  <h2>Methodology</h2>
+  <h3>Label and features</h3>
+  <p>The target, <code>is_declining_label</code>, is defined as a page whose trailing trend percentage is negative. Features are restricted to signals that are knowable at the decision moment: trailing click, session, and engagement counts, average search position (with an explicit fix for the "0 means no data, not rank zero" gotcha), content age and staleness tier, and word count &mdash; each with missingness handled via explicit indicator flags rather than a blind fill-with-zero, to avoid injecting a false category signal.</p>
+
+  <h3>Baseline</h3>
+  <p>The baseline is a transparent rule: flag a page as needing a refresh if it hasn't been updated in 180+ days <em>and</em> its average search position has slipped outside the top 10, provided position data actually exists for it. This rule alone identified 63 actionable items in an exploratory 30,000-page slice, giving an early signal the lane was worth pursuing before any modeling began.</p>
+
+  <h3>Validation design</h3>
+  <p>The train/test split is <strong>grouped by <code>client_id</code></strong> (an 80/20 <code>GroupShuffleSplit</code>) so that no single client's pages appear in both training and test data &mdash; this prevents the model from learning client-specific quirks and calling it generalization. A genuinely time-aware split was considered and explicitly rejected for this dataset, because the only duration-like field available (<code>days_since_last_update</code>) is not a calendar date, and splitting on it would silently mean splitting by freshness tier rather than by past-vs-future.</p>
+
+  <h3>The leakage check that changed the result</h3>
+  <div class="callout">
+    <strong>What happened:</strong> An initial logistic regression, trained on the full available feature set under the same grouped split, scored a precision of 1.00 and accuracy of 1.00 &mdash; a result read not as a success but as a red flag, per the project's own leakage-hunting checklist. A "confession test" (retraining with and without the two top coefficients) confirmed the cause: <code>impressions_last_30d</code> and <code>impressions_prev_30d</code> were mechanically tied to how the label itself was computed, and their coefficients (&minus;7.92 and +7.91) nearly cancelled &mdash; a textbook leakage signature.
+  </div>
+
+  <figure>
+    <img src="img/chart3_leakage_confession.png" alt="Bar chart showing accuracy collapsing from 100% to 67.2% once leakage features are removed, against a 62.8% base rate">
+    <figcaption>Removing the two label-sibling features collapses accuracy from a suspicious 100% to an honest ~67% &mdash; right at the base rate plus a modest real signal. This is the expected signature of leakage being fixed, not a worse model.</figcaption>
+  </figure>
+
+  <p>A second, quieter issue was also fixed: <code>avg_position == 0</code> was being read by early features as a literal top rank, when the data dictionary defines it as "no data." Rows were flagged and imputed from valid-only values instead.</p>
+
+  <h3>Leakage audit checklist (final feature set)</h3>
+  <table>
+    <tr><th>Check</th><th>Result</th></tr>
+    <tr><td>Features strictly precede the label window</td><td>Mostly confirmed &mdash; two same-window click/session features are lower-risk but flagged, not assumed safe</td></tr>
+    <tr><td>No label-derived or sibling columns</td><td>Confirmed by the confession test (accuracy collapse)</td></tr>
+    <tr><td>No pre-existing product scores as features</td><td>Confirmed clean</td></tr>
+    <tr><td>Split grouped by repeating entity</td><td>Confirmed &mdash; grouped by client_id</td></tr>
+    <tr><td>Base rate reported alongside every metric</td><td>Confirmed &mdash; 62.8% throughout</td></tr>
+    <tr><td>Top feature importance sanity-checked</td><td>Confirmed &mdash; healthy, spread-out coefficients post-fix</td></tr>
+    <tr><td>Metrics cross-validated out-of-fold</td><td>Not done &mdash; single holdout only; named as a limitation</td></tr>
+  </table>
+</section>
+
+<section id="results">
+  <h2>Results</h2>
+  <p>All numbers below are measured on the same held-out test split (6,163 rows) the rule baseline was also evaluated on.</p>
+
+  <figure>
+    <img src="img/chart1_model_vs_baseline.png" alt="Bar chart comparing the rule baseline and the honest model on precision, recall, and accuracy, against the 62.8% base rate">
+    <figcaption>The honest, leakage-checked model beats the Week-4 rule baseline on precision and recall, and sits modestly above the 62.8% base rate on accuracy &mdash; not the near-perfect score the leaky version produced.</figcaption>
+  </figure>
+
+  <table>
+    <tr><th>Metric</th><th>Rule baseline</th><th>Honest model</th></tr>
+    <tr><td>Precision</td><td>0.611</td><td>0.714</td></tr>
+    <tr><td>Recall</td><td>0.463</td><td>0.798</td></tr>
+    <tr><td>Accuracy</td><td>0.478</td><td>0.672</td></tr>
+    <tr><td>Base rate</td><td colspan="2">0.628</td></tr>
+  </table>
+
+  <h3>The metric that actually matters for a ranked queue</h3>
+  <p>Global accuracy describes the whole test set, but this model is used top-down as a ranked queue &mdash; so <strong>precision@K</strong> (how clean the top of the list is) is the honest metric to report, not global accuracy alone.</p>
+
+  <figure>
+    <img src="img/chart2_precision_at_k.png" alt="Bar chart showing precision improves from 71.4% globally to 86% in the top 250 and 88% in the top 100 of the ranked queue">
+    <figcaption>Precision@100 &asymp; 0.88 and precision@250 &asymp; 0.86 &mdash; the queue is considerably more trustworthy at the top than the global precision figure alone would suggest.</figcaption>
+  </figure>
+
+  <h3>What the model leans on</h3>
+  <p>After the leakage fix, the top coefficients spread across several signals rather than one dominant feature &mdash; <code>clicks_last_30d</code>, <code>age_tier_order</code>, <code>engaged_sessions_90d</code>, <code>clicks_90d</code>, and the <code>has_avg_position</code> missingness flag are the leading drivers, none of them anywhere near as dominant as the leaked features were.</p>
+
+  <h3>An important caveat found while building the queue</h3>
+  <div class="callout">
+    The grouped holdout used to compute precision@K happened to land on 7 clients whose content is 100% <em>keyword article</em>. The model was trained on all three content types across all 32 clients, but the reported precision@100/@250 figures are directly demonstrated only for keyword articles. This should be re-checked with a different seed or a stratified split before leaning on the queue for the other two content types.
+  </div>
+</section>
+
+<section id="limitations">
+  <h2>Limitations &amp; Honest Framing</h2>
+  <ul>
+    <li><strong>Global precision is modest.</strong> At 0.714, it's meaningfully above the 62.8% base rate but far from a strong standalone predictor &mdash; the value is concentrated in the ranking, not in any single flagged item.</li>
+    <li><strong>No genuine time-based validation.</strong> The dataset used has no calendar date field, only a duration; this means the model cannot claim "this page will decline next month," only "this page currently resembles ones labeled declining in this dataset."</li>
+    <li><strong>Single train/test holdout, not cross-validated.</strong> The exact precision@K numbers would likely shift somewhat under a different random seed.</li>
+    <li><strong>Validated directly on one content type.</strong> Precision@K is demonstrated for keyword articles; feedly and comparison articles were in training but not independently confirmed in this holdout.</li>
+    <li><strong>Selection bias in prior program findings this project audited (not this model).</strong> Separate research claims reviewed during this internship &mdash; e.g. that refreshing aged pages produces large performance lifts &mdash; were found to rest on non-random editor selection of which pages got refreshed, meaning the reported lift mixes the refresh effect with the choosing effect. That distinction is discussed fully in the reproducibility notebooks linked below.</li>
+    <li><strong>This is decision support, not causal proof.</strong> Nothing here demonstrates that acting on the queue <em>causes</em> recovery &mdash; only that the ranking outperforms an unranked list and a simple rule baseline on this historical slice.</li>
+  </ul>
+</section>
+
+<section id="recommendations">
+  <h2>Ranked Recommendations</h2>
+  <ol>
+    <li><strong>Use the queue top-down, not as a flat list.</strong> Precision is highest in the first ~100&ndash;250 ranked items (~86&ndash;88%); treating rank 3,000 the same as rank 1 misuses the model.</li>
+    <li><strong>Route "no ranking data" items to a data-verification step, not the action queue.</strong> Roughly 1% of the held-out set had missing position data (<code>avg_position</code> was 0/unmeasured) &mdash; these should never be treated as "ranked last," only as "unverifiable, check tracking first."</li>
+    <li><strong>Re-validate before extending the queue to feedly or comparison articles.</strong> Because the current holdout happened to be keyword-article-heavy, teams should re-run validation with a stratified split before trusting precision@K figures for the other two content types.</li>
+    <li><strong>Never auto-publish or auto-edit from this queue.</strong> The model flags candidates for human review; a reviewer should sanity-check each reason code against context the model cannot see (seasonality, recent manual changes, paused campaigns).</li>
+    <li><strong>Monitor for the leakage signature reappearing.</strong> Periodically re-run the confession test on any new feature added to the pipeline &mdash; if one feature's coefficient suddenly dominates the way the removed impressions features did, that is the same failure mode resurfacing under a new name.</li>
+    <li><strong>Track base-rate drift as a retrain trigger.</strong> If the true share of declining content in a fresh sample moves more than ~5 points from 62.8%, the model's calibration is out of date.</li>
+  </ol>
+</section>
+
+<section id="repro">
+  <h2>Reproducibility</h2>
+  <p>All analysis is reproducible from the public repository. Key notebooks, in the order this paper builds on them:</p>
+  <ul>
+    <li><a href="https://github.com/muhammadabdurrehmanmaqsood/flyrank-ml-internship-abdurrehman/blob/main/work/notebooks/w03_data_contract.ipynb">w03_data_contract.ipynb</a> &mdash; grain, time window, and field-by-field public-safety classification</li>
+    <li><a href="https://github.com/muhammadabdurrehmanmaqsood/flyrank-ml-internship-abdurrehman/blob/main/work/notebooks/w04_baseline_score.ipynb">w04_baseline_score.ipynb</a> &mdash; the rule baseline and its ranked queue</li>
+    <li><a href="https://github.com/muhammadabdurrehmanmaqsood/flyrank-ml-internship-abdurrehman/blob/main/work/notebooks/w05_model.ipynb">w05_model.ipynb</a> &mdash; the first (leaky) model and the suspicious 100% score</li>
+    <li><a href="https://github.com/muhammadabdurrehmanmaqsood/flyrank-ml-internship-abdurrehman/blob/main/work/notebooks/w06_validation_audit.ipynb">w06_validation_audit.ipynb</a> &mdash; the leakage confession test, the honest re-validation, and the claim rewrites this paper is built on</li>
+    <li><a href="https://github.com/muhammadabdurrehmanmaqsood/flyrank-ml-internship-abdurrehman/blob/main/work/notebooks/w07_action_playbook.ipynb">w07_action_playbook.ipynb</a> &mdash; the precision@K analysis, the ranked queue, and the no-go list</li>
+    <li><a href="https://github.com/muhammadabdurrehmanmaqsood/flyrank-ml-internship-abdurrehman/blob/main/work/notebooks/capstone.ipynb">capstone.ipynb</a> &mdash; the synthesis notebook this paper mirrors section-by-section</li>
+  </ul>
+  <p>Random seed <code>42</code> is fixed throughout. All notebooks run top-to-bottom from a fresh clone of the repository; data is pulled directly from the repo's public, anonymized CSV at run time rather than committed as a static artifact.</p>
+</section>
+
+<section id="ack">
+  <h2>Acknowledgments &amp; Data Credit</h2>
+  <p>Built on the FlyRank ML Internship dataset &mdash; <a href="https://flyrank.ai" target="_blank" rel="noopener">flyrank.ai</a>.</p>
+</section>
+
+<footer>
+  This page is a public research artifact produced as part of the FlyRank ML Internship. No client names, raw URLs, or private search queries appear anywhere on this page or in its linked notebooks. All performance figures are measured on a held-out test split and reported with their base rate for context.
+</footer>
+
+</div>
+</body>
+</html>
