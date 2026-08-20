@@ -1,1 +1,1 @@
-café
+This file was a connectivity probe used while automating repo setup. Safe to delete.
