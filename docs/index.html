@@ -106,7 +106,7 @@
   </div>
 
   <figure>
-    <img src="img/chart3_leakage_confession.png" alt="Bar chart showing accuracy collapsing from 100% to 67.2% once leakage features are removed, against a 62.8% base rate">
+    <img src="img/chart1_leakage_story.svg" alt="Bar chart showing accuracy collapsing from 100% to 67.2% once leakage features are removed, against a 62.8% base rate">
     <figcaption>Removing the two label-sibling features collapses accuracy from a suspicious 100% to an honest ~67% &mdash; right at the base rate plus a modest real signal. This is the expected signature of leakage being fixed, not a worse model.</figcaption>
   </figure>
 
@@ -129,11 +129,6 @@
   <h2>Results</h2>
   <p>All numbers below are measured on the same held-out test split (6,163 rows) the rule baseline was also evaluated on.</p>
 
-  <figure>
-    <img src="img/chart1_model_vs_baseline.png" alt="Bar chart comparing the rule baseline and the honest model on precision, recall, and accuracy, against the 62.8% base rate">
-    <figcaption>The honest, leakage-checked model beats the Week-4 rule baseline on precision and recall, and sits modestly above the 62.8% base rate on accuracy &mdash; not the near-perfect score the leaky version produced.</figcaption>
-  </figure>
-
   <table>
     <tr><th>Metric</th><th>Rule baseline</th><th>Honest model</th></tr>
     <tr><td>Precision</td><td>0.611</td><td>0.714</td></tr>
@@ -146,12 +141,17 @@
   <p>Global accuracy describes the whole test set, but this model is used top-down as a ranked queue &mdash; so <strong>precision@K</strong> (how clean the top of the list is) is the honest metric to report, not global accuracy alone.</p>
 
   <figure>
-    <img src="img/chart2_precision_at_k.png" alt="Bar chart showing precision improves from 71.4% globally to 86% in the top 250 and 88% in the top 100 of the ranked queue">
+    <img src="img/chart2_precision_at_k.svg" alt="Bar chart showing precision improves from 71.4% globally to 86% in the top 250 and 88% in the top 100 of the ranked queue">
     <figcaption>Precision@100 &asymp; 0.88 and precision@250 &asymp; 0.86 &mdash; the queue is considerably more trustworthy at the top than the global precision figure alone would suggest.</figcaption>
   </figure>
 
   <h3>What the model leans on</h3>
   <p>After the leakage fix, the top coefficients spread across several signals rather than one dominant feature &mdash; <code>clicks_last_30d</code>, <code>age_tier_order</code>, <code>engaged_sessions_90d</code>, <code>clicks_90d</code>, and the <code>has_avg_position</code> missingness flag are the leading drivers, none of them anywhere near as dominant as the leaked features were.</p>
+
+  <figure>
+    <img src="img/chart3_coefficients.svg" alt="Horizontal bar chart of the honest model's top 8 coefficient magnitudes, showing no single feature dominating">
+    <figcaption>No single feature dominates the honest model &mdash; a healthy spread rather than the two leaked features nearly cancelling each other out.</figcaption>
+  </figure>
 
   <h3>An important caveat found while building the queue</h3>
   <div class="callout">
