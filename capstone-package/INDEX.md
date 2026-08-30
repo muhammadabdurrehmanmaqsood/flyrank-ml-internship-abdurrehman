@@ -11,9 +11,9 @@ One place, per Assignment 8.2: every deliverable for the whole track, linked bel
 | Portfolio site | ✅ Live | https://flyrank.abdurrehman.online |
 | Demo video (3–5 min, live run, one decision, one limitation) | ✅ Recorded | https://youtu.be/e-FmiwsWgjM |
 | Retrospective (500–800 words) | ✅ Done | [`RETROSPECTIVE.md`](RETROSPECTIVE.md) |
-| Build-in-public post | ⬜ Drafted for LinkedIn, needs publishing | [`BUILD_IN_PUBLIC_POST.md`](BUILD_IN_PUBLIC_POST.md) → link once posted |
-| Hours log | ⬜ Complete in portal, cross-check against commit history | internship.flyrank.ai |
-| Final review checkpoint | ⬜ Submit once the above are live | internship.flyrank.ai |
+| Build-in-public post | ✅ Published (LinkedIn) | https://lnkd.in/p/dkENasNm |
+| Hours log | ✅ Verified against commit history (195.5 hrs; capstone bucket credits on acceptance) | internship.flyrank.ai |
+| Final review checkpoint | ⬜ Submit now — every other deliverable above is live | internship.flyrank.ai |
 
 ## The story in one line
 

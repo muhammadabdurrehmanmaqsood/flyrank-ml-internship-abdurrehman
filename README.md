@@ -137,6 +137,7 @@ The `.gitignore` blocks datasets by default, and CI fails any commit that includ
 - **Live capstone paper (deployed):** https://muhammadabdurrehmanmaqsood.github.io/flyrank-ml-internship-abdurrehman/
 - **Demo video (live run, leakage story, AI-transparency callout):** https://youtu.be/e-FmiwsWgjM
 - **Portfolio site (built and hardened with Claude's help):** https://flyrank.abdurrehman.online
+- **Build-in-public post (LinkedIn):** https://lnkd.in/p/dkENasNm
 - **AI Fluency track submission package** (retrospective, demo script, build-in-public post, index): [`capstone-package/`](capstone-package/INDEX.md)
 
 ---
